@@ -37,7 +37,8 @@ export default function ReceiptsPage() {
       // Convert ReceiptItem[] to the format expected by the backend
       const receiptItems = items.map(item => ({
         jwl_part: item.jwl_part,
-        qty: item.qty
+        qty: item.qty,
+        unit_price: item.unit_price
       }));
 
       const receiptData = {
@@ -53,23 +54,24 @@ export default function ReceiptsPage() {
 
       const response = await apiService.generateReceipt(receiptData);
 
+      // Calculate line_total for each item
+      const itemsWithLineTotal = items.map(item => ({
+        ...item,
+        line_total: item.qty * item.unit_price
+      }));
+
       // Create receipt object for preview
       const receipt: Receipt = {
         receipt_number: response.receipt_number,
-        date: new Date().toISOString(),
-        customer: customer,
-        items: items,
+        created_at: new Date().toISOString(),
         subtotal: response.totals.subtotal,
-        tax_rate: 10,
-        tax_amount: response.totals.tax_amount,
-        grand_total: response.totals.grand_total,
-        company_name: 'Inventory Management System',
-        company_address: '123 Business St, City, State 12345'
+        tax: response.totals.tax_amount,
+        total: response.totals.grand_total
       };
 
       setCurrentReceipt(receipt);
       setCurrentCustomer(customer);
-      setCurrentItems(items);
+      setCurrentItems(itemsWithLineTotal);
       setShowPreview(true);
 
       // Reload inventory summary to reflect updated quantities

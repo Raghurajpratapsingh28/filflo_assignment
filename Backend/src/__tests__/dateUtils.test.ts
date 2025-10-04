@@ -19,9 +19,16 @@ describe('Date Utils', () => {
       expect(date.getDate()).toBe(15);
     });
 
+    it('should parse valid date string in YYYY-MM-DD format', () => {
+      const date = parseDateString('2024-03-15');
+      expect(date.getFullYear()).toBe(2024);
+      expect(date.getMonth()).toBe(2); // March (0-indexed)
+      expect(date.getDate()).toBe(15);
+    });
+
     it('should throw error for invalid date format', () => {
-      expect(() => parseDateString('2024-03-15')).toThrow('Invalid date format');
       expect(() => parseDateString('15/03/2024')).toThrow('Invalid date format');
+      expect(() => parseDateString('invalid-date')).toThrow('Invalid date format');
     });
   });
 

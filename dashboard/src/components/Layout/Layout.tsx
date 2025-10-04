@@ -18,7 +18,10 @@ export default function Layout({ children }: LayoutProps) {
 
       <main 
         className="pt-16 transition-all duration-300 ease-in-out"
-        style={{ marginLeft: `${sidebarWidth}px` }}
+        style={{ 
+          '--sidebar-width': `${sidebarWidth}px`,
+          marginLeft: 'var(--sidebar-width)'
+        } as React.CSSProperties & { '--sidebar-width': string }}
       >
         <div className="p-6">
           {children}

@@ -24,7 +24,19 @@ export interface RegisterRequest {
   username: string;
   password: string;
   email?: string;
-  role?: string;
+  role?: 'manager' | 'employee';
+}
+
+export interface CreateEmployeeRequest {
+  username: string;
+  password: string;
+  email?: string;
+}
+
+export interface UpdateEmployeeRequest {
+  username?: string;
+  password?: string;
+  email?: string;
 }
 
 /**
@@ -111,7 +123,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     username,
     hashed_password: hashedPassword,
     email,
-    role: role || 'user'
+    role: role || 'employee'
   });
 
   logger.info(`New user registered: ${username}`);
@@ -260,15 +272,218 @@ export const registerValidation = [
   body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('email').optional().isEmail().withMessage('Invalid email format'),
-  body('role').optional().isIn(['user', 'admin']).withMessage('Invalid role')
+  body('role').optional().isIn(['manager', 'employee']).withMessage('Invalid role')
 ];
 
 export const updateProfileValidation = [
   body('email').optional().isEmail().withMessage('Invalid email format'),
-  body('role').optional().isIn(['user', 'admin']).withMessage('Invalid role')
+  body('role').optional().isIn(['manager', 'employee']).withMessage('Invalid role')
 ];
 
 export const changePasswordValidation = [
   body('currentPassword').notEmpty().withMessage('Current password is required'),
   body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters')
+];
+
+/**
+ * Create new employee (Manager only)
+ * POST /api/employees
+ */
+export const createEmployee = asyncHandler(async (req: Request, res: Response) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    throw new CustomError('Validation failed', 400);
+  }
+
+  const currentUser = (req as any).user;
+  if (!currentUser || currentUser.role !== 'manager') {
+    throw new CustomError('Only managers can create employees', 403);
+  }
+
+  const { username, password, email }: CreateEmployeeRequest = req.body;
+
+  // Check if user already exists
+  const existingUser = await User.findOne({ 
+    where: { username } 
+  });
+  if (existingUser) {
+    throw new CustomError('Username already exists', 400);
+  }
+
+  // Check if email already exists (if provided)
+  if (email) {
+    const existingEmail = await User.findOne({ 
+      where: { email } 
+    });
+    if (existingEmail) {
+      throw new CustomError('Email already exists', 400);
+    }
+  }
+
+  // Hash password
+  const hashedPassword = await hashPassword(password);
+
+  // Create employee
+  const employee = await User.create({
+    username,
+    hashed_password: hashedPassword,
+    email,
+    role: 'employee'
+  });
+
+  logger.info(`Manager ${currentUser.username} created employee: ${username}`);
+
+  res.status(201).json({
+    message: 'Employee created successfully',
+    employee: {
+      id: employee.id,
+      username: employee.username,
+      email: employee.email,
+      role: employee.role,
+      created_at: employee.created_at
+    }
+  });
+});
+
+/**
+ * Get all employees (Manager only)
+ * GET /api/employees
+ */
+export const getEmployees = asyncHandler(async (req: Request, res: Response) => {
+  const currentUser = (req as any).user;
+  if (!currentUser || currentUser.role !== 'manager') {
+    throw new CustomError('Only managers can view employees', 403);
+  }
+
+  const employees = await User.findAll({
+    where: { role: 'employee' },
+    attributes: { exclude: ['hashed_password'] },
+    order: [['created_at', 'DESC']]
+  });
+
+  res.json({
+    employees: employees.map(emp => ({
+      id: emp.id,
+      username: emp.username,
+      email: emp.email,
+      role: emp.role,
+      created_at: emp.created_at,
+      updated_at: emp.updated_at
+    }))
+  });
+});
+
+/**
+ * Update employee (Manager only)
+ * PUT /api/employees/:id
+ */
+export const updateEmployee = asyncHandler(async (req: Request, res: Response) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    throw new CustomError('Validation failed', 400);
+  }
+
+  const currentUser = (req as any).user;
+  if (!currentUser || currentUser.role !== 'manager') {
+    throw new CustomError('Only managers can update employees', 403);
+  }
+
+  const employeeId = parseInt(req.params.id);
+  const { username, password, email }: UpdateEmployeeRequest = req.body;
+
+  const employee = await User.findByPk(employeeId);
+  if (!employee) {
+    throw new CustomError('Employee not found', 404);
+  }
+
+  if (employee.role !== 'employee') {
+    throw new CustomError('Can only update employee accounts', 400);
+  }
+
+  // Check if username already exists (if provided and different)
+  if (username && username !== employee.username) {
+    const existingUser = await User.findOne({ 
+      where: { username } 
+    });
+    if (existingUser) {
+      throw new CustomError('Username already exists', 400);
+    }
+  }
+
+  // Check if email already exists (if provided and different)
+  if (email && email !== employee.email) {
+    const existingEmail = await User.findOne({ 
+      where: { email } 
+    });
+    if (existingEmail) {
+      throw new CustomError('Email already exists', 400);
+    }
+  }
+
+  // Prepare update data
+  const updateData: any = {};
+  if (username) updateData.username = username;
+  if (email) updateData.email = email;
+  if (password) {
+    updateData.hashed_password = await hashPassword(password);
+  }
+
+  // Update employee
+  await employee.update(updateData);
+
+  logger.info(`Manager ${currentUser.username} updated employee: ${employee.username}`);
+
+  res.json({
+    message: 'Employee updated successfully',
+    employee: {
+      id: employee.id,
+      username: employee.username,
+      email: employee.email,
+      role: employee.role,
+      updated_at: employee.updated_at
+    }
+  });
+});
+
+/**
+ * Delete employee (Manager only)
+ * DELETE /api/employees/:id
+ */
+export const deleteEmployee = asyncHandler(async (req: Request, res: Response) => {
+  const currentUser = (req as any).user;
+  if (!currentUser || currentUser.role !== 'manager') {
+    throw new CustomError('Only managers can delete employees', 403);
+  }
+
+  const employeeId = parseInt(req.params.id);
+  const employee = await User.findByPk(employeeId);
+  
+  if (!employee) {
+    throw new CustomError('Employee not found', 404);
+  }
+
+  if (employee.role !== 'employee') {
+    throw new CustomError('Can only delete employee accounts', 400);
+  }
+
+  await employee.destroy();
+
+  logger.info(`Manager ${currentUser.username} deleted employee: ${employee.username}`);
+
+  res.json({
+    message: 'Employee deleted successfully'
+  });
+});
+
+// Validation rules for employee management
+export const createEmployeeValidation = [
+  body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('email').optional().isEmail().withMessage('Invalid email format')
+];
+
+export const updateEmployeeValidation = [
+  body('username').optional().isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
+  body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('email').optional().isEmail().withMessage('Invalid email format')
 ];

@@ -4,6 +4,8 @@ A complete Express.js backend application in TypeScript for inventory ageing das
 
 ## Features
 
+- **Two-Tier Authentication**: Manager and Employee roles with role-based access control
+- **Employee Management**: Managers can create, update, and delete employee accounts
 - **CSV Data Upload**: Upload and process inventory data from CSV files
 - **Inventory Management**: Store and query inventory with ageing and expiry calculations
 - **Dashboard KPIs**: Get aggregated metrics for dashboard visualization
@@ -130,10 +132,54 @@ All endpoints are prefixed with `/api`.
 Login with username and password.
 ```json
 {
-  "username": "admin",
-  "password": "admin123"
+  "username": "manager",
+  "password": "manager123"
 }
 ```
+
+**Default Manager Account:**
+- Username: `manager`
+- Password: `manager123`
+- Role: `manager`
+
+#### POST /api/register
+Register a new user (public endpoint for initial setup).
+```json
+{
+  "username": "newuser",
+  "password": "password123",
+  "email": "user@example.com",
+  "role": "employee"
+}
+```
+
+### Employee Management Endpoints (Manager Only)
+
+#### POST /api/employees
+Create a new employee account.
+```json
+{
+  "username": "employee1",
+  "password": "password123",
+  "email": "employee1@company.com"
+}
+```
+
+#### GET /api/employees
+Get all employee accounts.
+
+#### PUT /api/employees/:id
+Update an employee account.
+```json
+{
+  "username": "updated_employee",
+  "password": "newpassword123",
+  "email": "updated@company.com"
+}
+```
+
+#### DELETE /api/employees/:id
+Delete an employee account.
 
 **Response:**
 ```json
@@ -414,10 +460,29 @@ Common HTTP status codes:
 - `404`: Not Found
 - `500`: Internal Server Error
 
+## Role-Based Access Control
+
+### Manager Role
+- ✅ Create, read, update, delete employee accounts
+- ✅ Access all inventory features
+- ✅ Upload CSV files
+- ✅ Generate receipts
+- ✅ View dashboard KPIs
+- ✅ Manage own profile
+
+### Employee Role
+- ❌ Cannot manage other users
+- ✅ Access inventory features
+- ✅ View inventory data
+- ✅ Generate receipts
+- ✅ View dashboard KPIs
+- ✅ Manage own profile
+
 ## Security Features
 
+- **Two-Tier Authentication**: Manager and Employee roles with proper access control
 - **JWT Authentication**: Secure token-based authentication
-- **Password Hashing**: bcryptjs with salt rounds
+- **Password Hashing**: bcryptjs with 12 salt rounds
 - **CORS Protection**: Configurable cross-origin resource sharing
 - **Rate Limiting**: Prevents abuse with request limits
 - **Input Validation**: express-validator for request validation
@@ -481,7 +546,7 @@ Log levels: `error`, `warn`, `info`, `debug`
 | `DB_PASSWORD` | Database password | `password` |
 | `JWT_SECRET` | JWT secret key | Required |
 | `JWT_EXPIRES_IN` | JWT expiration | `24h` |
-| `CORS_ORIGIN` | CORS origin | `http://localhost:3000` |
+| `CORS_ORIGIN` | CORS origin | `http://localhost:5174` |
 | `MAX_FILE_SIZE` | Max upload size | `10485760` (10MB) |
 | `UPLOAD_PATH` | Upload directory | `./uploads` |
 | `LOG_LEVEL` | Log level | `info` |

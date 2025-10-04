@@ -1,4 +1,4 @@
-import { Video as LucideIcon } from 'lucide-react';
+import { LucideIcon } from 'lucide-react';
 
 interface KPICardProps {
   title: string;

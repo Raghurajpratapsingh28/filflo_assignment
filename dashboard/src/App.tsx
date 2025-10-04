@@ -2,11 +2,13 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { SidebarProvider } from './context/SidebarContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { RoleProtectedRoute } from './components/RoleProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ReceiptsPage from './pages/ReceiptsPage';
 import UploadPage from './pages/UploadPage';
 import ProfilePage from './pages/ProfilePage';
+import { EmployeeManagementPage } from './pages/EmployeeManagementPage';
 
 function App() {
   return (
@@ -45,6 +47,14 @@ function App() {
                 <ProtectedRoute>
                   <ProfilePage />
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/employees"
+              element={
+                <RoleProtectedRoute requiredRole="manager">
+                  <EmployeeManagementPage />
+                </RoleProtectedRoute>
               }
             />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />

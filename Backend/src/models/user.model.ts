@@ -49,8 +49,11 @@ User.init(
     },
     role: {
       type: DataTypes.STRING(20),
-      allowNull: true,
-      defaultValue: 'user'
+      allowNull: false,
+      defaultValue: 'employee',
+      validate: {
+        isIn: [['manager', 'employee']]
+      }
     }
   },
   {

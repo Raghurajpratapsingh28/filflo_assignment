@@ -79,10 +79,10 @@ export default function ReceiptPreview({
                       <td className="px-4 py-3 text-sm text-gray-600">{item.description}</td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-center">{item.qty}</td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                        ${item.unit_price.toFixed(2)}
+                        ${(item.unit_price || 0).toFixed(2)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
-                        ${item.line_total.toFixed(2)}
+                        ${(item.line_total || 0).toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -94,17 +94,17 @@ export default function ReceiptPreview({
               <div className="w-64 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Subtotal:</span>
-                  <span className="text-gray-900 font-medium">${receipt.subtotal.toFixed(2)}</span>
+                  <span className="text-gray-900 font-medium">${(receipt.subtotal || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Tax (10%):</span>
-                  <span className="text-gray-900 font-medium">${receipt.tax.toFixed(2)}</span>
+                  <span className="text-gray-900 font-medium">${(receipt.tax || 0).toFixed(2)}</span>
                 </div>
                 <div className="border-t border-gray-300 pt-2">
                   <div className="flex justify-between">
                     <span className="text-lg font-bold text-gray-900">Total:</span>
                     <span className="text-lg font-bold text-[#1976D2]">
-                      ${receipt.total.toFixed(2)}
+                      ${(receipt.total || 0).toFixed(2)}
                     </span>
                   </div>
                 </div>

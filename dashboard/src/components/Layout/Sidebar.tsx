@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Upload, X, GripVertical } from 'lucide-react';
+import { LayoutDashboard, Receipt, Upload, Users, X, GripVertical } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { sidebarWidth, setSidebarWidth } = useSidebar();
+  const { user } = useAuth();
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const startXRef = useRef<number>(0);
@@ -19,6 +21,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { to: '/dashboard', icon: LayoutDashboard, label: 'Inventory Dashboard' },
     { to: '/receipts', icon: Receipt, label: 'Customer Receipts' },
     { to: '/upload', icon: Upload, label: 'Upload CSV' },
+    // Only show employee management for managers
+    ...(user?.role === 'manager' ? [{ to: '/employees', icon: Users, label: 'Employee Management' }] : []),
   ];
 
   const handleMouseDown = (e: React.MouseEvent) => {

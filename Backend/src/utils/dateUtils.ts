@@ -8,15 +8,24 @@ export interface DateCalculationResult {
 }
 
 /**
- * Parse date string in DD-MM-YYYY format to Date object
- * @param dateString - Date string in DD-MM-YYYY format
+ * Parse date string in DD-MM-YYYY or YYYY-MM-DD format to Date object
+ * @param dateString - Date string in DD-MM-YYYY or YYYY-MM-DD format
  * @returns Date object
  */
 export const parseDateString = (dateString: string): Date => {
-  const parsedDate = parse(dateString, 'dd-MM-yyyy', new Date());
+  // Try DD-MM-YYYY format first
+  let parsedDate = parse(dateString, 'dd-MM-yyyy', new Date());
+  
+  // If that fails, try YYYY-MM-DD format
   if (isNaN(parsedDate.getTime())) {
-    throw new Error(`Invalid date format: ${dateString}. Expected format: DD-MM-YYYY`);
+    parsedDate = parse(dateString, 'yyyy-MM-dd', new Date());
   }
+  
+  // If both fail, throw error
+  if (isNaN(parsedDate.getTime())) {
+    throw new Error(`Invalid date format: ${dateString}. Expected format: DD-MM-YYYY or YYYY-MM-DD`);
+  }
+  
   return parsedDate;
 };
 

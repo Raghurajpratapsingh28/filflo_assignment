@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, FileText } from 'lucide-react';
 import { InventorySummary, ReceiptItem, Customer } from '../../types';
 
@@ -20,40 +20,91 @@ export default function ReceiptForm({ inventorySummary, onGenerateReceipt }: Rec
   const [selectedInventory, setSelectedInventory] = useState<InventorySummary | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
   const [unitPrice, setUnitPrice] = useState<number>(0);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const filteredInventory = inventorySummary.filter(item =>
     item.jwl_part.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Calculate available quantity for selected inventory item
+  const getAvailableQuantity = (inventoryItem: InventorySummary) => {
+    const existingItem = selectedItems.find(item => item.jwl_part === inventoryItem.jwl_part);
+    if (existingItem) {
+      return inventoryItem.available_qty - existingItem.qty;
+    }
+    return inventoryItem.available_qty;
+  };
+
   const handleAddItem = () => {
     if (!selectedInventory || quantity <= 0 || unitPrice < 0) return;
 
-    if (quantity > selectedInventory.available_qty) {
-      alert(`Only ${selectedInventory.available_qty} units available`);
-      return;
+    // Check if item already exists in selected items
+    const existingItemIndex = selectedItems.findIndex(item => item.jwl_part === selectedInventory.jwl_part);
+    
+    if (existingItemIndex !== -1) {
+      // Calculate total quantity including existing item
+      const totalQuantity = selectedItems[existingItemIndex].qty + quantity;
+      
+      if (totalQuantity > selectedInventory.available_qty) {
+        alert(`Cannot add ${quantity} more units. Total would be ${totalQuantity}, but only ${selectedInventory.available_qty} units available`);
+        return;
+      }
+      
+      // Update existing item
+      const updatedItems = [...selectedItems];
+      updatedItems[existingItemIndex] = {
+        ...updatedItems[existingItemIndex],
+        qty: totalQuantity,
+        line_total: totalQuantity * unitPrice,
+        unit_price: unitPrice // Update to latest price
+      };
+      setSelectedItems(updatedItems);
+    } else {
+      // Check stock availability for new item
+      if (quantity > selectedInventory.available_qty) {
+        alert(`Only ${selectedInventory.available_qty} units available`);
+        return;
+      }
+
+      const newItem: ReceiptItem = {
+        jwl_part: selectedInventory.jwl_part,
+        description: selectedInventory.description,
+        qty: quantity,
+        unit_price: unitPrice,
+        line_total: quantity * unitPrice,
+      };
+
+      setSelectedItems([...selectedItems, newItem]);
     }
 
-    const newItem: ReceiptItem = {
-      jwl_part: selectedInventory.jwl_part,
-      description: selectedInventory.description,
-      qty: quantity,
-      unit_price: unitPrice,
-      total_price: quantity * unitPrice,
-    };
-
-    setSelectedItems([...selectedItems, newItem]);
     setSelectedInventory(null);
     setQuantity(1);
     setUnitPrice(0);
     setSearchTerm('');
+    setShowDropdown(false);
   };
 
   const handleRemoveItem = (index: number) => {
     setSelectedItems(selectedItems.filter((_, i) => i !== index));
   };
 
-  const subtotal = selectedItems.reduce((sum, item) => sum + item.total_price, 0);
+  const subtotal = selectedItems.reduce((sum, item) => sum + item.line_total, 0);
   const tax = subtotal * 0.1;
   const total = subtotal + tax;
 
@@ -130,7 +181,7 @@ export default function ReceiptForm({ inventorySummary, onGenerateReceipt }: Rec
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Products</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Search Product
             </label>
@@ -138,26 +189,49 @@ export default function ReceiptForm({ inventorySummary, onGenerateReceipt }: Rec
               type="text"
               placeholder="Search by part number or description..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setShowDropdown(e.target.value.length > 0);
+              }}
+              onFocus={() => setShowDropdown(searchTerm.length > 0)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1976D2] focus:border-transparent"
             />
-            {searchTerm && filteredInventory.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full max-w-md bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                {filteredInventory.slice(0, 10).map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedInventory(item);
-                      setSearchTerm(item.jwl_part + ' - ' + item.description);
-                    }}
-                    className="w-full text-left px-4 py-2 hover:bg-gray-100 border-b border-gray-200 last:border-b-0"
-                  >
-                    <p className="text-sm font-medium text-gray-900">{item.jwl_part}</p>
-                    <p className="text-xs text-gray-600">{item.description}</p>
-                    <p className="text-xs text-gray-500">Available: {item.available_qty}</p>
-                  </button>
-                ))}
+            {showDropdown && searchTerm && filteredInventory.length > 0 && (
+              <div ref={dropdownRef} className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {filteredInventory.slice(0, 10).map((item, index) => {
+                  const availableQty = getAvailableQuantity(item);
+                  const isOutOfStock = availableQty <= 0;
+                  
+                  return (
+                    <button
+                      key={item.id || `${item.jwl_part}-${index}`}
+                      type="button"
+                      onClick={() => {
+                        if (!isOutOfStock) {
+                          setSelectedInventory(item);
+                          setSearchTerm(item.jwl_part + ' - ' + item.description);
+                          setShowDropdown(false);
+                        }
+                      }}
+                      disabled={isOutOfStock}
+                      className={`w-full text-left px-4 py-2 border-b border-gray-200 last:border-b-0 ${
+                        isOutOfStock 
+                          ? 'bg-gray-50 text-gray-400 cursor-not-allowed' 
+                          : 'hover:bg-gray-100'
+                      }`}
+                    >
+                      <p className={`text-sm font-medium ${isOutOfStock ? 'text-gray-400' : 'text-gray-900'}`}>
+                        {item.jwl_part}
+                      </p>
+                      <p className={`text-xs ${isOutOfStock ? 'text-gray-400' : 'text-gray-600'}`}>
+                        {item.description}
+                      </p>
+                      <p className={`text-xs ${isOutOfStock ? 'text-red-500' : 'text-gray-500'}`}>
+                        {isOutOfStock ? 'Out of Stock' : `Available: ${availableQty}`}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -165,15 +239,30 @@ export default function ReceiptForm({ inventorySummary, onGenerateReceipt }: Rec
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Quantity
+              {selectedInventory && (
+                <span className="text-xs text-gray-500 ml-1">
+                  (Max: {getAvailableQuantity(selectedInventory)})
+                </span>
+              )}
             </label>
             <input
               type="number"
               min="1"
-              max={selectedInventory?.available_qty || 999999}
+              max={selectedInventory ? getAvailableQuantity(selectedInventory) : 999999}
               value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
+              onChange={(e) => {
+                const newQuantity = Number(e.target.value);
+                const maxQty = selectedInventory ? getAvailableQuantity(selectedInventory) : 999999;
+                if (newQuantity <= maxQty) {
+                  setQuantity(newQuantity);
+                }
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1976D2] focus:border-transparent"
+              disabled={!selectedInventory || getAvailableQuantity(selectedInventory) <= 0}
             />
+            {selectedInventory && getAvailableQuantity(selectedInventory) <= 0 && (
+              <p className="text-xs text-red-600 mt-1">No more units available</p>
+            )}
           </div>
 
           <div>
@@ -194,7 +283,7 @@ export default function ReceiptForm({ inventorySummary, onGenerateReceipt }: Rec
         <button
           type="button"
           onClick={handleAddItem}
-          disabled={!selectedInventory || quantity <= 0}
+          disabled={!selectedInventory || quantity <= 0 || (selectedInventory && getAvailableQuantity(selectedInventory) <= 0)}
           className="px-4 py-2 bg-[#1976D2] text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus className="w-4 h-4" />
@@ -217,30 +306,42 @@ export default function ReceiptForm({ inventorySummary, onGenerateReceipt }: Rec
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {selectedItems.map((item, index) => (
-                    <tr key={index}>
-                      <td className="px-4 py-2 text-sm text-gray-900">{item.jwl_part}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600 max-w-xs truncate">
-                        {item.description}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-900 text-right">{item.qty}</td>
-                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                        ${item.unit_price.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-900 text-right font-medium">
-                        ${item.total_price.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(index)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {selectedItems.map((item, index) => {
+                    const inventoryItem = inventorySummary.find(inv => inv.jwl_part === item.jwl_part);
+                    const remainingStock = inventoryItem ? inventoryItem.available_qty - item.qty : 0;
+                    
+                    return (
+                      <tr key={index}>
+                        <td className="px-4 py-2 text-sm text-gray-900">{item.jwl_part}</td>
+                        <td className="px-4 py-2 text-sm text-gray-600 max-w-xs truncate">
+                          {item.description}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                          {item.qty}
+                          {remainingStock >= 0 && (
+                            <span className="text-xs text-gray-500 ml-1">
+                              ({remainingStock} left)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                          ${item.unit_price.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900 text-right font-medium">
+                          ${item.line_total.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(index)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

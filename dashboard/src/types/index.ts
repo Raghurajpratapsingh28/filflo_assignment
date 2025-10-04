@@ -2,8 +2,29 @@ export interface User {
   id: number;
   username: string;
   email?: string;
-  role?: string;
+  role?: 'manager' | 'employee';
   created_at?: string;
+}
+
+export interface Employee {
+  id: number;
+  username: string;
+  email?: string;
+  role: 'employee';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateEmployeeRequest {
+  username: string;
+  password: string;
+  email?: string;
+}
+
+export interface UpdateEmployeeRequest {
+  username?: string;
+  password?: string;
+  email?: string;
 }
 
 export interface InventoryItem {
@@ -35,20 +56,15 @@ export interface ReceiptItem {
   description: string;
   qty: number;
   unit_price: number;
-  total_price: number;
+  line_total: number;
 }
 
 export interface Receipt {
   receipt_number: string;
-  date: string;
-  customer: Customer;
-  items: ReceiptItem[];
+  created_at: string;
   subtotal: number;
-  tax_rate: number;
-  tax_amount: number;
-  grand_total: number;
-  company_name: string;
-  company_address: string;
+  tax: number;
+  total: number;
 }
 
 export interface InventoryFilters {
@@ -94,6 +110,7 @@ export interface ExpiryRisk {
 }
 
 export interface InventorySummary {
+  id?: string;
   jwl_part: string;
   description: string;
   available_qty: number;

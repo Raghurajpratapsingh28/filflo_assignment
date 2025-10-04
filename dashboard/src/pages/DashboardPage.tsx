@@ -5,11 +5,12 @@ import KPICard from '../components/Dashboard/KPICard';
 import FilterBar from '../components/Dashboard/FilterBar';
 import Charts from '../components/Dashboard/Charts';
 import InventoryTable from '../components/Dashboard/InventoryTable';
-import { InventoryItem, InventoryFilters, InventoryKPIs, AgeingBucket, ExpiryRisk } from '../types';
+import { InventoryItem, InventoryFilters, InventoryKPIs } from '../types';
 import apiService from '../lib/api';
 
 export default function DashboardPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [totalInventoryCount, setTotalInventoryCount] = useState<number>(0);
   const [kpis, setKpis] = useState<InventoryKPIs | null>(null);
   const [uniqueParts, setUniqueParts] = useState<{ jwl_parts: string[]; customer_parts: string[] }>({ jwl_parts: [], customer_parts: [] });
   const [filters, setFilters] = useState<InventoryFilters>({});
@@ -46,8 +47,10 @@ export default function DashboardPage() {
 
   const loadInventory = async () => {
     try {
-      const response = await apiService.getInventory(filters);
+      // Set a high limit to get all inventory items
+      const response = await apiService.getInventory({ ...filters, limit: 10000 });
       setInventory(response.data);
+      setTotalInventoryCount(response.total);
     } catch (err: any) {
       setError(err.message || 'Failed to load inventory data');
       console.error('Error loading inventory:', err);
@@ -58,9 +61,9 @@ export default function DashboardPage() {
     if (!kpis) return [];
     
     return [
-      { label: '0-30 days', count: kpis.ageing_buckets['0-30'], qty: 0 },
-      { label: '30-60 days', count: kpis.ageing_buckets['30-60'], qty: 0 },
-      { label: '60+ days', count: kpis.ageing_buckets['60+'], qty: 0 },
+      { label: '0-30 days', count: kpis.ageing_buckets['0-30'], qty: kpis.ageing_buckets['0-30'] },
+      { label: '30-60 days', count: kpis.ageing_buckets['30-60'], qty: kpis.ageing_buckets['30-60'] },
+      { label: '60+ days', count: kpis.ageing_buckets['60+'], qty: kpis.ageing_buckets['60+'] },
     ];
   }, [kpis]);
 
@@ -176,7 +179,11 @@ export default function DashboardPage() {
         trendData={trendData}
       />
 
-      <InventoryTable data={inventory} />
+      <InventoryTable 
+        data={inventory} 
+        totalCount={totalInventoryCount}
+        onDataChange={loadInventory} 
+      />
     </Layout>
   );
 }

@@ -23,4 +23,11 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Mobile sidebar layout - no margin on small screens */
+  @media (max-width: 1023px) {
+    main {
+      margin-left: 0 !important;
+    }
+  }
 }

@@ -33,8 +33,8 @@ export default function Charts({ ageingBuckets, expiryRisks, trendData }: Charts
   const getBucketColor = (label: string) => {
     if (label.includes('0-30')) return COLORS.green;
     if (label.includes('30-60')) return COLORS.yellow;
-    if (label.includes('60-90')) return COLORS.orange;
-    return COLORS.red;
+    if (label.includes('60+')) return COLORS.red;
+    return COLORS.blue;
   };
 
   const getRiskColor = (category: string) => {
@@ -52,11 +52,20 @@ export default function Charts({ ageingBuckets, expiryRisks, trendData }: Charts
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={ageingBuckets}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="label" />
+            <XAxis 
+              dataKey="label" 
+              tick={{ fontSize: 12 }}
+              angle={-45}
+              textAnchor="end"
+              height={60}
+            />
             <YAxis />
-            <Tooltip />
+            <Tooltip 
+              formatter={(value: any) => [value, 'Items']}
+              labelFormatter={(label: string) => `Ageing: ${label}`}
+            />
             <Legend />
-            <Bar dataKey="qty" name="Quantity" radius={[8, 8, 0, 0]}>
+            <Bar dataKey="qty" name="Items" radius={[8, 8, 0, 0]}>
               {ageingBuckets.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={getBucketColor(entry.label)} />
               ))}

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { body, query, validationResult } from 'express-validator';
-import { Op } from 'sequelize';
+import { Op, QueryTypes } from 'sequelize';
 import { Inventory } from '../models/inventory.model';
 import { parseDateString, calculateInventoryMetrics, getDateRange } from '../utils/dateUtils';
 import { generateReceiptPDF, generateReceiptNumber, calculateReceiptTotals, ReceiptItem, CustomerInfo } from '../utils/pdfGenerator';
@@ -55,7 +55,7 @@ export interface InventorySummary {
 
 export interface ReceiptRequest {
   customer: CustomerInfo;
-  items: { jwl_part: string; qty: number }[];
+  items: { jwl_part: string; qty: number; unit_price?: number }[];
   tax_rate?: number;
 }
 
@@ -362,22 +362,53 @@ export const getDashboardKPIs = asyncHandler(async (req: Request, res: Response)
  * GET /api/inventory-summary
  */
 export const getInventorySummary = asyncHandler(async (req: Request, res: Response) => {
-  const summary = await Inventory.findAll({
-    attributes: [
-      'jwl_part',
-      'description',
-      [Inventory.sequelize!.fn('SUM', Inventory.sequelize!.col('qty')), 'available_qty']
-    ],
-    group: ['jwl_part', 'description'],
-    having: Inventory.sequelize!.where(Inventory.sequelize!.fn('SUM', Inventory.sequelize!.col('qty')), '>', 0),
-    order: [['jwl_part', 'ASC']]
+  // First, let's check if we have any inventory items at all
+  const totalItems = await Inventory.count();
+  logger.info(`Total inventory items in database: ${totalItems}`);
+  
+  // Get a sample of raw inventory items
+  const sampleItems = await Inventory.findAll({
+    attributes: ['jwl_part', 'description', 'qty'],
+    limit: 5
   });
+  logger.info(`Sample inventory items:`, JSON.stringify(sampleItems, null, 2));
 
-  const response: InventorySummary[] = summary.map(item => ({
-    jwl_part: item.jwl_part,
-    description: item.description,
-    available_qty: parseInt((item as any).available_qty)
-  }));
+  // Try using raw SQL query as an alternative
+  const rawSummary = await Inventory.sequelize!.query(`
+    SELECT 
+      jwl_part,
+      description,
+      SUM(qty) as available_qty
+    FROM inventories 
+    WHERE qty > 0
+    GROUP BY jwl_part, description
+    ORDER BY jwl_part ASC
+  `, {
+    type: QueryTypes.SELECT
+  });
+  
+  logger.info(`Raw SQL query returned ${rawSummary.length} items`);
+  if (rawSummary.length > 0) {
+    logger.info(`First raw item sample:`, JSON.stringify(rawSummary[0], null, 2));
+  }
+
+  const response: InventorySummary[] = rawSummary.map((item: any) => {
+    const qty = item.available_qty;
+    // Handle different data types and ensure we get a valid number
+    let availableQty = 0;
+    if (qty !== null && qty !== undefined) {
+      const parsed = parseInt(qty.toString());
+      availableQty = isNaN(parsed) ? 0 : parsed;
+    }
+    
+    logger.info(`Processing item ${item.jwl_part}: raw qty=${qty}, parsed qty=${availableQty}`);
+    
+    return {
+      jwl_part: item.jwl_part,
+      description: item.description,
+      available_qty: availableQty
+    };
+  });
 
   res.json(response);
 });
@@ -419,12 +450,15 @@ export const generateReceipt = asyncHandler(async (req: Request, res: Response) 
       remainingQty -= deductQty;
     }
 
+    const unitPrice = item.unit_price || 0;
+    const totalPrice = unitPrice * item.qty;
+    
     receiptItems.push({
       jwl_part: item.jwl_part,
       description: inventoryItems[0]?.description || '',
       qty: item.qty,
-      unit_price: 0, // Placeholder for future price implementation
-      total_price: 0
+      unit_price: unitPrice,
+      total_price: totalPrice
     });
   }
 
@@ -458,6 +492,103 @@ export const generateReceipt = asyncHandler(async (req: Request, res: Response) 
 });
 
 /**
+ * Get single inventory item by ID
+ * GET /api/inventory/:id
+ */
+export const getInventoryItem = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  
+  const item = await Inventory.findByPk(id);
+  if (!item) {
+    throw new CustomError('Inventory item not found', 404);
+  }
+  
+  res.json(item);
+});
+
+/**
+ * Update inventory item
+ * PUT /api/inventory/:id
+ */
+export const updateInventoryItem = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const updateData = req.body;
+  
+  const item = await Inventory.findByPk(id);
+  if (!item) {
+    throw new CustomError('Inventory item not found', 404);
+  }
+  
+  // Parse dates if provided
+  if (updateData.mfg_date) {
+    updateData.mfg_date = parseDateString(updateData.mfg_date);
+  }
+  if (updateData.exp_date) {
+    updateData.exp_date = parseDateString(updateData.exp_date);
+  }
+  
+  // Recalculate ageing and expiry days if dates are updated
+  if (updateData.mfg_date || updateData.exp_date) {
+    const mfgDate = updateData.mfg_date || item.mfg_date;
+    const expDate = updateData.exp_date || item.exp_date;
+    const metrics = calculateInventoryMetrics(mfgDate, expDate);
+    updateData.ageing_days = metrics.ageingDays;
+    updateData.days_to_expiry = metrics.daysToExpiry;
+  }
+  
+  await item.update(updateData);
+  
+  logger.info(`Inventory item ${id} updated`);
+  res.json(item);
+});
+
+/**
+ * Delete inventory item
+ * DELETE /api/inventory/:id
+ */
+export const deleteInventoryItem = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  
+  const item = await Inventory.findByPk(id);
+  if (!item) {
+    throw new CustomError('Inventory item not found', 404);
+  }
+  
+  await item.destroy();
+  
+  logger.info(`Inventory item ${id} deleted`);
+  res.json({ message: 'Inventory item deleted successfully' });
+});
+
+/**
+ * Create new inventory item
+ * POST /api/inventory
+ */
+export const createInventoryItem = asyncHandler(async (req: Request, res: Response) => {
+  const itemData = req.body;
+  
+  // Parse dates
+  if (itemData.mfg_date) {
+    itemData.mfg_date = parseDateString(itemData.mfg_date);
+  }
+  if (itemData.exp_date) {
+    itemData.exp_date = parseDateString(itemData.exp_date);
+  }
+  
+  // Calculate ageing and expiry days
+  if (itemData.mfg_date && itemData.exp_date) {
+    const metrics = calculateInventoryMetrics(itemData.mfg_date, itemData.exp_date);
+    itemData.ageing_days = metrics.ageingDays;
+    itemData.days_to_expiry = metrics.daysToExpiry;
+  }
+  
+  const newItem = await Inventory.create(itemData);
+  
+  logger.info(`New inventory item created with ID: ${newItem.id}`);
+  res.status(201).json(newItem);
+});
+
+/**
  * Health check endpoint
  * GET /api/health
  */
@@ -477,5 +608,28 @@ export const receiptValidation = [
   body('items').isArray({ min: 1 }).withMessage('At least one item is required'),
   body('items.*.jwl_part').notEmpty().withMessage('Part number is required'),
   body('items.*.qty').isInt({ min: 1 }).withMessage('Quantity must be a positive integer'),
+  body('items.*.unit_price').optional().isFloat({ min: 0 }).withMessage('Unit price must be a positive number'),
   body('tax_rate').optional().isFloat({ min: 0, max: 100 }).withMessage('Tax rate must be between 0 and 100')
+];
+
+export const inventoryValidation = [
+  body('jwl_part').notEmpty().withMessage('JWL Part is required'),
+  body('customer_part').notEmpty().withMessage('Customer Part is required'),
+  body('description').notEmpty().withMessage('Description is required'),
+  body('uom').notEmpty().withMessage('UOM is required'),
+  body('batch').notEmpty().withMessage('Batch is required'),
+  body('mfg_date').notEmpty().withMessage('Manufacturing date is required'),
+  body('exp_date').notEmpty().withMessage('Expiry date is required'),
+  body('qty').isInt({ min: 0 }).withMessage('Quantity must be a non-negative integer'),
+  body('weight').optional().isFloat({ min: 0 }).withMessage('Weight must be a non-negative number')
+];
+
+export const inventoryUpdateValidation = [
+  body('jwl_part').optional().notEmpty().withMessage('JWL Part cannot be empty'),
+  body('customer_part').optional().notEmpty().withMessage('Customer Part cannot be empty'),
+  body('description').optional().notEmpty().withMessage('Description cannot be empty'),
+  body('uom').optional().notEmpty().withMessage('UOM cannot be empty'),
+  body('batch').optional().notEmpty().withMessage('Batch cannot be empty'),
+  body('qty').optional().isInt({ min: 0 }).withMessage('Quantity must be a non-negative integer'),
+  body('weight').optional().isFloat({ min: 0 }).withMessage('Weight must be a non-negative number')
 ];
