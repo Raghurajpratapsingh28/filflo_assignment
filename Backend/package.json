@@ -11,7 +11,9 @@
     "test:watch": "jest --watch",
     "migrate": "npx sequelize-cli db:migrate",
     "migrate:undo": "npx sequelize-cli db:migrate:undo",
-    "seed": "npx sequelize-cli db:seed:all"
+    "seed": "npx sequelize-cli db:seed:all",
+    "postbuild": "npm run migrate",
+    "heroku-postbuild": "npm run build && npm run migrate"
   },
   "keywords": [
     "express",

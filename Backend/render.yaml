@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: inventory-backend
+    env: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://your-frontend-domain.onrender.com
+      - key: DB_HOST
+        value: ep-rapid-voice-adtwc61t-pooler.c-2.us-east-1.aws.neon.tech
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_NAME
+        value: neondb
+      - key: DB_USER
+        value: neondb_owner
+      - key: DB_PASSWORD
+        value: npg_1YTKvwyUWgj5
+      - key: DB_SSL
+        value: "true"
+      - key: MAX_FILE_SIZE
+        value: "10485760"
+      - key: UPLOAD_PATH
+        value: "./uploads"
+      - key: LOG_LEVEL
+        value: "info"
+      - key: LOG_FILE
+        value: "./logs/app.log"
