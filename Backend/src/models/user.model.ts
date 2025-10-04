@@ -6,7 +6,7 @@ export interface UserAttributes {
   username: string;
   hashed_password: string;
   email?: string;
-  role?: string;
+  role?: 'manager' | 'employee';
   created_at?: Date;
   updated_at?: Date;
 }
@@ -18,7 +18,7 @@ export class User extends Model<UserAttributes, UserCreationAttributes> implemen
   public username!: string;
   public hashed_password!: string;
   public email?: string;
-  public role?: string;
+  public role?: 'manager' | 'employee';
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
