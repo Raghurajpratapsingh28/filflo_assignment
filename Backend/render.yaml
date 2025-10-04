@@ -14,6 +14,8 @@ services:
         generateValue: true
       - key: CORS_ORIGIN
         value: https://your-frontend-domain.onrender.com
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_1YTKvwyUWgj5@ep-rapid-voice-adtwc61t-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       - key: DB_HOST
         value: ep-rapid-voice-adtwc61t-pooler.c-2.us-east-1.aws.neon.tech
       - key: DB_PORT
