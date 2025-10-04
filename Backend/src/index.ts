@@ -126,7 +126,7 @@ const createDefaultAdmin = async () => {
         username: 'admin',
         hashed_password: adminHashedPassword,
         email: 'admin@inventory.com',
-        role: 'admin'
+        role: 'manager'
       });
       logger.info('Default admin user created (username: admin, password: admin123)');
     }
@@ -139,7 +139,7 @@ const createDefaultAdmin = async () => {
         username: 'manager',
         hashed_password: managerHashedPassword,
         email: 'manager@inventory.com',
-        role: 'admin'
+        role: 'manager'
       });
       logger.info('Manager user created (username: manager, password: raghuraj)');
     }

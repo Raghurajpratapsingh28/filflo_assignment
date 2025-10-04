@@ -138,8 +138,8 @@ export default function ProfilePage() {
                 onChange={(e) => setRole(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1976D2] focus:border-transparent"
               >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
+                <option value="employee">Employee</option>
+                <option value="manager">Manager</option>
               </select>
             </div>
 
