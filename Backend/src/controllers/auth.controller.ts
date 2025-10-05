@@ -199,11 +199,14 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
       throw new CustomError('Email already exists', 400);
     }
   }
+if(user.role != "manager"){
+  throw new CustomError('You are not authorized to update the role', 403);
+}
 
   // Update user
   await user.update({
     email: email || user.email,
-    role: role || user.role
+    role: role || user.role,
   });
 
   logger.info(`User ${user.username} updated profile`);
