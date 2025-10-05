@@ -122,11 +122,7 @@ export default function LoginPage() {
               Internal employees only
             </p>
             <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h3 className="text-sm font-medium text-blue-900 mb-2">Default Manager Account</h3>
-              <p className="text-xs text-blue-700">
-                Username: <span className="font-mono">manager</span><br/>
-                Password: <span className="font-mono">manager123</span>
-              </p>
+              
             </div>
           </div>
         </div>
